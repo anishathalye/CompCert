@@ -43,6 +43,7 @@ let mnemonic_names = StringSet.of_list
   "Psltiul"; "Psltiuw"; "Psltiw"; "Psltl"; "Psltul"; "Psltuw"; "Psltw";
   "Psrail"; "Psraiw"; "Psral"; "Psraw"; "Psrlil"; "Psrliw"; "Psrll"; "Psrlw";
   "Psubl"; "Psubw"; "Psw"; "Psw_a"; "Pxoril"; "Pxoriw"; "Pxorl"; "Pxorw";
+  "Pallocframe"; "Pfreeframe";
   ]
 
 type instruction_arg =
@@ -156,8 +157,6 @@ let pp_instructions pp ic =
         | EF_vstore _ -> assert false
       end
     (* Expanded in Asmexpand *)
-    | Pallocframe _
-    | Pfreeframe _
     | Pseqw _
     | Psnew _
     | Pseql _
@@ -321,6 +320,8 @@ let pp_instructions pp ic =
     | Pxoriw(rd, rs, imm) -> instruction pp "Pxoriw" [Ireg rd; Ireg0 rs; Int imm]
     | Pxorl(rd, rs1, rs2) -> instruction pp "Pxorl" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
     | Pxorw(rd, rs1, rs2) -> instruction pp "Pxorw" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
+    | Pallocframe(sz, pos) -> instruction pp "Pallocframe" [Int sz; Int pos]
+    | Pfreeframe(sz, pos) -> instruction pp "Pfreeframe" [Int sz; Int pos]
   in
     pp_jarray instruction pp ic
 

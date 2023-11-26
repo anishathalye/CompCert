@@ -55,17 +55,22 @@ let compile_c_file sourcename ifile ofile =
   (* Parse the ast *)
   let csyntax = parse_c_file sourcename ifile in
   (* Convert to Asm *)
-  let asm =
-    match Compiler.apply_partial
-               (Compiler.transf_c_program csyntax)
-               Asmexpand.expand_program with
+  let asm_preexpand =
+    match Compiler.transf_c_program csyntax with
     | Errors.OK asm ->
         asm
     | Errors.Error msg ->
       let loc = file_loc sourcename in
         fatal_error loc "%a"  print_error msg in
   (* Dump Asm in binary and JSON format *)
-  AsmToJSON.print_if asm sourcename;
+  AsmToJSON.print_if asm_preexpand sourcename;
+  let asm =
+    match Asmexpand.expand_program asm_preexpand with
+    | Errors.OK asm ->
+        asm
+    | Errors.Error msg ->
+      let loc = file_loc sourcename in
+        fatal_error loc "%a"  print_error msg in
   (* Print Asm in text form *)
   let oc = open_out ofile in
   PrintAsm.print_program oc asm;
