@@ -172,12 +172,12 @@ and pp_hi_lo pp (hi, lo) =
 let pp_external_function pp = function
   | EF_builtin (name, _) ->
       pp_jobject_start pp;
-      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "Builtin";
+      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "EF_builtin";
       pp_jmember pp "Name" pp_jstring (camlstring_of_coqstring name);
       pp_jobject_end pp
   | EF_memcpy (sz, al) ->
       pp_jobject_start pp;
-      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "Memcpy";
+      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "EF_memcpy";
       pp_jmember pp "Size" pp_z sz;
       pp_jmember pp "Alignment" pp_z al;
       pp_jobject_end pp
