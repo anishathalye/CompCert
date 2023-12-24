@@ -60,6 +60,7 @@ type instruction_arg =
   | Offset of offset
   | String of string
   | Symbol of ident * BinNums.coq_Z
+  | ExternalFunction of AST.external_function
   | BuiltinArgs of Asm.preg AST.builtin_arg list
   | BuiltinRes of Asm.preg AST.builtin_res
 
@@ -168,6 +169,20 @@ and pp_hi_lo pp (hi, lo) =
   pp_jmember pp "Lo" pp_builtin_res lo;
   pp_jobject_end pp
 
+let pp_external_function pp = function
+  | EF_builtin (name, _) ->
+      pp_jobject_start pp;
+      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "Builtin";
+      pp_jmember pp "Name" pp_jstring (camlstring_of_coqstring name);
+      pp_jobject_end pp
+  | EF_memcpy (sz, al) ->
+      pp_jobject_start pp;
+      pp_jmember ~first:true pp "ExternalFunction" pp_jstring "Memcpy";
+      pp_jmember pp "Size" pp_z sz;
+      pp_jmember pp "Alignment" pp_z al;
+      pp_jobject_end pp
+  | _ -> assert false (* unsupported *)
+
 let pp_arg pp = function
   | ALabel lbl -> pp_label pp lbl
   | Atom a -> pp_atom_constant pp a
@@ -182,6 +197,7 @@ let pp_arg pp = function
   | Offset ofs -> pp_offset pp ofs
   | String s -> pp_jsingle_object pp "String" pp_jstring s
   | Symbol (id, ofs) -> pp_jsingle_object pp "Symbol" pp_symbol (id, ofs)
+  | ExternalFunction ef -> pp_jsingle_object pp "ExternalFunction" pp_external_function ef
   | BuiltinArgs args -> pp_jsingle_object pp "Args" (pp_jarray pp_builtin_arg) args
   | BuiltinRes res -> pp_jsingle_object pp "Res" pp_builtin_res res
 
@@ -209,8 +225,8 @@ let pp_instructions pp ic =
   let [@ocaml.warning "+4"] instruction pp = function
     | Pbuiltin (ef, args, res) ->
       begin match ef with
-        | EF_builtin (name, sg) -> instruction pp "Pbuiltin" [String "EF_builtin"; String (camlstring_of_coqstring name); BuiltinArgs args; BuiltinRes res]
-        | EF_memcpy (sz, al) -> instruction pp "Pbuiltin" [String "EF_memcpy"; Int sz; Int al; BuiltinArgs args; BuiltinRes res]
+        | EF_builtin (name, sg) -> instruction pp "Pbuiltin" [ExternalFunction ef; BuiltinArgs args; BuiltinRes res]
+        | EF_memcpy (sz, al) -> instruction pp "Pbuiltin" [ExternalFunction ef; BuiltinArgs args; BuiltinRes res]
         | EF_annot (kind,txt, targs) ->
 
           begin match P.to_int kind with
