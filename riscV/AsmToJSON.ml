@@ -43,7 +43,7 @@ let mnemonic_names = StringSet.of_list
   "Psltiul"; "Psltiuw"; "Psltiw"; "Psltl"; "Psltul"; "Psltuw"; "Psltw";
   "Psrail"; "Psraiw"; "Psral"; "Psraw"; "Psrlil"; "Psrliw"; "Psrll"; "Psrlw";
   "Psubl"; "Psubw"; "Psw"; "Psw_a"; "Pxoril"; "Pxoriw"; "Pxorl"; "Pxorw";
-  "Pallocframe"; "Pfreeframe";
+  "Pallocframe"; "Pfreeframe"; "Pbuiltin"
   ]
 
 type instruction_arg =
@@ -60,6 +60,8 @@ type instruction_arg =
   | Offset of offset
   | String of string
   | Symbol of ident * BinNums.coq_Z
+  | BuiltinArgs of Asm.preg AST.builtin_arg list
+  | BuiltinRes of Asm.preg AST.builtin_res
 
 let pp_reg pp reg =
   pp_jsingle_object pp "Register" pp_jstring reg
@@ -91,6 +93,81 @@ let pp_offset pp ofs =
   | Ofsimm(ofs) -> pp_jsingle_object pp "Integer" pp_int64 ofs
   | Ofslow(id, ofs) -> pp_jsingle_object pp "OffsetSymbolLow" pp_symbol (id, ofs)
 
+let pp_chunk pp = function
+  | Mint8signed -> pp_jstring pp "Mint8signed"
+  | Mint8unsigned -> pp_jstring pp "Mint8unsigned"
+  | Mint16signed -> pp_jstring pp "Mint16signed"
+  | Mint16unsigned -> pp_jstring pp "Mint16unsigned"
+  | Mint32 -> pp_jstring pp "Mint32"
+  | Mint64 -> pp_jstring pp "Mint64"
+  | Mfloat32 -> pp_jstring pp "Mfloat32"
+  | Mfloat64 -> pp_jstring pp "Mfloat64"
+  | Many32 -> pp_jstring pp "Many32"
+  | Many64 -> pp_jstring pp "Many64"
+
+let pp_chunk_ofs pp (chunk, ofs) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "Chunk" pp_chunk chunk;
+  pp_jmember pp "Offset" pp_int64 ofs;
+  pp_jobject_end pp
+
+let pp_ofs pp ofs =
+  pp_jsingle_object pp "Offset" pp_int64 ofs
+
+let pp_chunk_id_ofs pp (chunk, id, ofs) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "Chunk" pp_chunk chunk;
+  pp_jmember pp "Name" pp_atom id;
+  pp_jmember pp "Offset" pp_int64 ofs;
+  pp_jobject_end pp
+
+let pp_id_ofs pp (id, ofs) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "Name" pp_atom id;
+  pp_jmember pp "Offset" pp_int64 ofs;
+  pp_jobject_end pp
+
+let rec pp_builtin_arg pp = function
+  | BA r -> begin match r with
+            | PC -> pp_jsingle_object pp "Register" pp_jstring "pc"
+            | FR r -> pp_freg pp r
+            | IR r -> pp_ireg pp r
+            end
+  | BA_int v -> pp_jsingle_object pp "Int" pp_int64 v
+  | BA_long v -> pp_jsingle_object pp "Long" pp_int64 v
+  | BA_float v -> pp_jsingle_object pp "Float" pp_float64_constant v
+  | BA_single v -> pp_jsingle_object pp "Single" pp_float32_constant v
+  | BA_loadstack (chunk, ofs) -> pp_jsingle_object pp "LoadStack" pp_chunk_ofs (chunk, ofs)
+  | BA_addrstack ofs -> pp_jsingle_object pp "AddrStack" pp_ofs ofs
+  | BA_loadglobal (chunk, id, ofs) -> pp_jsingle_object pp "LoadGlobal" pp_chunk_id_ofs (chunk, id, ofs)
+  | BA_addrglobal (id, ofs) -> pp_jsingle_object pp "AddrGlobal" pp_id_ofs (id, ofs)
+  | BA_splitlong (hi, lo) -> pp_jsingle_object pp "SplitLong" pp_hi_lo (hi, lo)
+  | BA_addptr (a1, a2) -> pp_jsingle_object pp "AddPtr" pp_a1_a2 (a1, a2)
+and pp_hi_lo pp (hi, lo) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "Hi" pp_builtin_arg hi;
+  pp_jmember pp "Lo" pp_builtin_arg lo;
+  pp_jobject_end pp
+and pp_a1_a2 pp (a1, a2) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "A1" pp_builtin_arg a1;
+  pp_jmember pp "A2" pp_builtin_arg a2;
+  pp_jobject_end pp
+
+let rec pp_builtin_res pp = function
+  | BR r -> begin match r with
+            | PC -> pp_jsingle_object pp "Register" pp_jstring "pc"
+            | FR r -> pp_freg pp r
+            | IR r -> pp_ireg pp r
+            end
+  | BR_none -> pp_jstring pp "None"
+  | BR_splitlong (hi, lo) -> pp_jsingle_object pp "SplitLong" pp_hi_lo (hi, lo)
+and pp_hi_lo pp (hi, lo) =
+  pp_jobject_start pp;
+  pp_jmember ~first:true pp "Hi" pp_builtin_res hi;
+  pp_jmember pp "Lo" pp_builtin_res lo;
+  pp_jobject_end pp
+
 let pp_arg pp = function
   | ALabel lbl -> pp_label pp lbl
   | Atom a -> pp_atom_constant pp a
@@ -99,21 +176,25 @@ let pp_arg pp = function
   | Freg fr -> pp_freg pp fr
   | Id -> pp_id_const pp ()
   | Int i
-  | Int64 i -> pp_jsingle_object pp "Integer" pp_int64 i
+  | Int64 i -> pp_int_constant pp i
   | Ireg ir -> pp_ireg pp ir
   | Ireg0 ir -> pp_ireg0 pp ir
   | Offset ofs -> pp_offset pp ofs
   | String s -> pp_jsingle_object pp "String" pp_jstring s
   | Symbol (id, ofs) -> pp_jsingle_object pp "Symbol" pp_symbol (id, ofs)
+  | BuiltinArgs args -> pp_jsingle_object pp "Args" (pp_jarray pp_builtin_arg) args
+  | BuiltinRes res -> pp_jsingle_object pp "Res" pp_builtin_res res
 
 let pp_instructions pp ic =
   let ic = List.filter (fun s -> match s with
       | Pbuiltin (ef,args,_) ->
+        (* the inductive type external_function is documented in AST.v *)
         begin match ef with
-          | EF_inline_asm _ -> true
           | EF_annot  (kind,txt,targs) ->
             P.to_int kind = 2 && AisAnnot.json_ais_annot TargetPrinter.preg_annot "x2" (camlstring_of_coqstring txt) args <> []
-          | _ -> false
+          | EF_annot_val _ -> false (* don't care about annotations, we can filter them out *)
+          | EF_debug _ -> false (* don't need this for now, though it might be handy to add in later *)
+          | _ -> true (* preserve these, crash later if it's something that's unsupported, e.g., vload *)
         end
       | _ -> true) ic in
 
@@ -126,11 +207,10 @@ let pp_instructions pp ic =
   in
 
   let [@ocaml.warning "+4"] instruction pp = function
-    | Pbuiltin (ef, args, _) ->
+    | Pbuiltin (ef, args, res) ->
       begin match ef with
-        | EF_inline_asm _ ->
-          instruction pp "Pinlineasm" [Id];
-          Diagnostics.(warning no_loc Inline_asm_sdump "inline assembler is not supported in sdump")
+        | EF_builtin (name, sg) -> instruction pp "Pbuiltin" [String "EF_builtin"; String (camlstring_of_coqstring name); BuiltinArgs args; BuiltinRes res]
+        | EF_memcpy _ -> instruction pp "Pbuiltin" [String "EF_memcpy"; BuiltinArgs args; BuiltinRes res]
         | EF_annot (kind,txt, targs) ->
 
           begin match P.to_int kind with
@@ -145,13 +225,12 @@ let pp_instructions pp ic =
           | _ -> assert false
           end
         (* Builtins that are not exported to JSON *)
+        | EF_inline_asm _
         | EF_annot_val _
-        | EF_builtin _
         | EF_debug _
         | EF_external _
         | EF_free
         | EF_malloc
-        | EF_memcpy _
         | EF_runtime _
         | EF_vload _
         | EF_vstore _ -> assert false
@@ -162,7 +241,7 @@ let pp_instructions pp ic =
     | Pseql _
     | Psnel _
     | Pcvtl2w _
-    | Pcvtw2l _ -> assert false
+    | Pcvtw2l _ -> assert false (* TODO need to implement these eventually *)
     (* RISC-V instructions *)
     | Paddil(rd, rs, imm) -> instruction pp "Paddil" [Ireg rd; Ireg0 rs; Int64 imm]
     | Paddiw(rd, rs, imm) -> instruction pp "Paddiw" [Ireg rd; Ireg0 rs; Int imm]
