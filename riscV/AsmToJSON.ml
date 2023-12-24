@@ -210,7 +210,7 @@ let pp_instructions pp ic =
     | Pbuiltin (ef, args, res) ->
       begin match ef with
         | EF_builtin (name, sg) -> instruction pp "Pbuiltin" [String "EF_builtin"; String (camlstring_of_coqstring name); BuiltinArgs args; BuiltinRes res]
-        | EF_memcpy _ -> instruction pp "Pbuiltin" [String "EF_memcpy"; BuiltinArgs args; BuiltinRes res]
+        | EF_memcpy (sz, al) -> instruction pp "Pbuiltin" [String "EF_memcpy"; Int sz; Int al; BuiltinArgs args; BuiltinRes res]
         | EF_annot (kind,txt, targs) ->
 
           begin match P.to_int kind with
