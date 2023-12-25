@@ -43,6 +43,7 @@ let mnemonic_names = StringSet.of_list
   "Psltiul"; "Psltiuw"; "Psltiw"; "Psltl"; "Psltul"; "Psltuw"; "Psltw";
   "Psrail"; "Psraiw"; "Psral"; "Psraw"; "Psrlil"; "Psrliw"; "Psrll"; "Psrlw";
   "Psubl"; "Psubw"; "Psw"; "Psw_a"; "Pxoril"; "Pxoriw"; "Pxorl"; "Pxorw";
+  "Pseqw"; "Psnew"; "Pseql"; "Psnel"; "Pcvtl2w"; "Pcvtw2l";
   "Pallocframe"; "Pfreeframe"; "Pbuiltin"
   ]
 
@@ -251,13 +252,13 @@ let pp_instructions pp ic =
         | EF_vload _
         | EF_vstore _ -> assert false
       end
-    (* Expanded in Asmexpand *)
-    | Pseqw _
-    | Psnew _
-    | Pseql _
-    | Psnel _
-    | Pcvtl2w _
-    | Pcvtw2l _ -> assert false (* TODO need to implement these eventually *)
+    (* Expanded in Asmexpand, so we still need to deal with these *)
+    | Pseqw(rd, rs1, rs2) -> instruction pp "Pseqw" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
+    | Psnew(rd, rs1, rs2) -> instruction pp "Psnew" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
+    | Pseql(rd, rs1, rs2) -> instruction pp "Pseql" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
+    | Psnel(rd, rs1, rs2) -> instruction pp "Psnel" [Ireg rd; Ireg0 rs1; Ireg0 rs2]
+    | Pcvtl2w(rd, rs) -> instruction pp "Pcvtl2w" [Ireg rd; Ireg0 rs]
+    | Pcvtw2l(r) -> instruction pp "Pcvtw2l" [Ireg r]
     (* RISC-V instructions *)
     | Paddil(rd, rs, imm) -> instruction pp "Paddil" [Ireg rd; Ireg0 rs; Int64 imm]
     | Paddiw(rd, rs, imm) -> instruction pp "Paddiw" [Ireg rd; Ireg0 rs; Int imm]
