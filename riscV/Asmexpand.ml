@@ -246,11 +246,14 @@ let expand_builtin_memcpy_big sz al src dst =
   emit (Pbnew (X X7, X0, lbl))
 
 let expand_builtin_memcpy  sz al args =
+  (* delimited by nops *)
+  emit Pnop;
   let (dst, src) =
     match args with [d; s] -> (d, s) | _ -> assert false in
   if sz <= 32
   then expand_builtin_memcpy_small sz al src dst
-  else expand_builtin_memcpy_big sz al src dst
+  else expand_builtin_memcpy_big sz al src dst;
+  emit Pnop
 
 (* Handling of volatile reads and writes *)
 
